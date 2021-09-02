@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="noindex,nofollow">
+    <title>Auto Paste URL</title>
+    <link rel="icon" href="/favicon.ico">
+    <style>
+
+*, ::before, ::after {
+  box-sizing: border-box;
+}
+
+html, body {
+  font-family: monospace;
+  word-break: break-all;
+  cursor: default;
+}
+
+input {
+  font-family: monospace;
+}
+
+hr {
+  margin: 2rem 0;
+  height: 0;
+  border: 0;
+  border-top: 1px solid #ccc;
+}
+
+dl {
+  font-size: .9rem;
+}
+
+dt {
+  font-weight: bold;
+}
+
+#paste {
+  position: absolute;
+  top: -9999px;
+  left: -9999px;
+  opacity: 0;
+}
+
+#controllers {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+}
+
+#denied-message {
+  display: none;  /* Clipboad API 拒否時は inline-block に変更する */
+  margin-left: .5rem;
+  color: #f00;
+  font-size: .8rem;
+  font-weight: bold;
+}
+
+#output:empty::before {
+  content: "[Output]";
+}
+
+#history:empty::before {
+  content: "[History]";
+}
+
+    </style>
+    <script>
+
+/** メッセージ定義 */
+const messages = {
+  failedToPaste: '[Failed To Paste]',
+  noInput      : '[No Input]',
+  noValue      : '[No Value]',
+  notUrl       : '[Not URL]'
+};
+
+/** Clipboard API が拒否されている場合は true にしクリップボード監視処理が動作しないようにする */
+let isDenied = false;
+
+/**
+ * 文字列が URL かどうか判別して画面に表示する
+ * 
+ * @param {string} text 文字列
+ */
+function outputText(text) {
+  const outputElem = document.getElementById('output');
+  const beforeOutputHtml = outputElem.innerHTML;
+  const anchorText = `<a href="${text}" target="_blank" rel="noopener noreferrer" download>${text}</a>`;
+  if(beforeOutputHtml === anchorText) return;  // Same Values
+  const historyElem = document.getElementById('history');
+  if(beforeOutputHtml && !Object.values(messages).includes(beforeOutputHtml) && !historyElem.innerHTML.includes(beforeOutputHtml)) historyElem.insertAdjacentHTML('afterbegin', `<li>${beforeOutputHtml}</li>`);
+  outputElem.innerHTML = Object.values(messages).includes(text) ? text : !text.startsWith('http://') && !text.startsWith('https://') ? messages.notUrl : anchorText;
+}
+
+/** クリップボードを読み取り内容を解釈して画面に表示する */
+async function paste() {
+  if(isDenied) {
+    return console.log('Clipboard API is already denied');
+  }
+  
+  try {
+    const text = await navigator.clipboard.readText();
+    outputText(text.trim() || messages.noValue);
+  }
+  catch(error) {
+    console.warn(messages.failedToPaste, error);
+    outputText(messages.failedToPaste);
+    
+    // ペーストが許可されていない場合はエラーを抑止する
+    if(error && error.message && error.message.includes('Read permission denied')) {
+      console.log('Clipboard API is denied');
+      isDenied = true;
+      document.getElementById('denied-message').style.display = 'inline-block';
+    }
+  }
+}
+
+// Clipboard API を使うため onload 時に初期処理を行う
+window.addEventListener('load', () => {
+  // 「Input」欄
+  const inputElem = document.getElementById('input');
+  // 「Input」欄への入力ごとに入力文字列を解釈して画面に表示する
+  inputElem.addEventListener('input', event => {
+    const text = event.target.value;
+    outputText(text.trim() || messages.noInput);
+  });
+  // ウィンドウ (タブ) をアクティブにした時に「Input」欄リセットする
+  window.addEventListener('focus', () => {
+    inputElem.value = '';
+  });
+  
+  // 「Paste」ボタン
+  const pasteElem = document.getElementById('paste');
+  // 画面初期表示時にクリップボードを読み取り内容を解釈して画面に表示する (Clipbard API を発火させるためボタン押下イベントにしている)
+  pasteElem.addEventListener('click', paste);
+  pasteElem.click();
+  // ウィンドウ (タブ) をアクティブにした時にクリップボードを読み取り内容を解釈して画面に表示する
+  window.addEventListener('focus', paste);
+});
+
+    </script>
+  </head>
+  <body>
+
+<button type="button" id="paste" tabindex="-1">Paste</button>  <!-- Hidden -->
+
+<p id="controllers">
+  <input type="text" id="input" value="" placeholder="Input">
+  <span id="denied-message">Clipboard API Is Denied</span>
+</div>
+
+<p id="output"></p>
+<ol id="history" reversed></ol>
+
+<hr>
+<dl>
+  <dt>オマケの Bookmarklet … window.prompt() で入力された文字列からダウンロードリンクを生成する</dt>
+  <dd>data:text/html,&lt;script&gt;u=prompt('URL?');document.documentElement.innerHTML=`&lt;a href=&quot;${u}&quot; target=&quot;_blank&quot; rel=&quot;noopener noreferrer&quot; download&gt;${u}&lt;/a&gt;`&lt;/script&gt;</dd>
+</dl>
+<ul>
+  <li><a href="https://neos21.net/">Neo's World</a></li>
+  <li><a href="https://github.com/Neos21">GitHub - Neos21</a></li>
+  <li><a href="https://github.com/Neos21/auto-paste-url">GitHub - auto-paste-url</a></li>
+  <li><a href="https://neos21.github.io/auto-paste-url/">GitHub Pages - Auto Paste URL</a></li>
+</ul>
+
+  </body>
+</html>
